@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>สรุปสต๊อกคาเฟ่ - Cafe Stock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="./style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1c1917">
+
+        <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyDbnM6XVkAIj1a1cSuo2qgAJLb4euVLsWg",
+          authDomain: "cafe-stock-alert.firebaseapp.com",
+          projectId: "cafe-stock-alert",
+          storageBucket: "cafe-stock-alert.firebasestorage.app",
+          messagingSenderId: "320377962389",
+          appId: "1:320377962389:web:e71edf9bc87df8028ec09c",
+          measurementId: "G-S9EK0THP2J"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+    </script>
+</head>
+
+<body class="min-h-screen flex flex-col text-stone-800 bg-stone-50 overflow-y-auto">
+    <div id="toastMsg"
+        class="fixed top-16 left-1/2 -translate-x-1/2 bg-stone-800 text-white px-5 py-3 rounded-2xl shadow-2xl z-[200] transition-all duration-500 opacity-0 pointer-events-none flex items-center gap-3 transform -translate-y-10 w-[90%] max-w-sm text-sm font-medium">
+        <i data-lucide="bell" id="toastIcon" class="w-6 h-6 text-amber-400 shrink-0"></i>
+        <div class="flex flex-col">
+            <span id="toastTitle"
+                class="font-bold text-[10px] text-stone-300 uppercase tracking-wider mb-0.5 hidden">การแจ้งเตือน</span>
+            <span id="toastText" class="leading-tight">ข้อความ</span>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <div class="bg-stone-800 px-4 py-4 shadow-sm z-10 flex items-center shrink-0 border-b border-amber-500 border-b-4">
+        <a href="index.html" class="p-2 -ml-2 mr-2 text-stone-300 hover:bg-stone-700 rounded-full transition"><i
+                data-lucide="arrow-left" class="w-5 h-5"></i></a>
+        <h1 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="clipboard-list" class="text-amber-400 w-5 h-5"></i>
+            สรุปสต๊อกคาเฟ่
+        </h1>
+    </div>
+
+    <!-- Container -->
+    <div class="flex-1 overflow-y-auto p-4 flex flex-col">
+        <div class="grid grid-cols-2 gap-3 mb-5">
+            <div
+                class="bg-red-50 p-4 rounded-2xl border border-red-100 flex flex-col items-center text-center shadow-sm">
+                <span class="text-xs text-red-600 font-bold mb-1">ต้องทิ้ง/หมดอายุ</span>
+                <span class="text-3xl font-black text-red-600" id="sum-expired">0</span>
+            </div>
+            <div
+                class="bg-stone-800 p-4 rounded-2xl border border-stone-600 flex flex-col items-center text-center shadow-lg col-span-2">
+                <span
+                    class="text-xs text-emerald-400 font-bold mb-1 uppercase tracking-widest">มูลค่าความเสียดาย/เสียหาย
+                    (บาท)</span>
+                <span class="text-4xl font-black text-white" id="sum-waste-cost">0.00</span>
+                <span class="text-[10px] text-stone-400 mt-1">คำนวณจากราคาต้นทุนของหน้าที่ต้องทิ้ง</span>
+            </div>
+            <div
+                class="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex flex-col items-center text-center shadow-sm">
+                <span class="text-xs text-orange-600 font-bold mb-1 text-[10px]">เตือน (&lt;12ชม.)</span>
+                <span class="text-2xl font-black text-orange-600" id="sum-danger">0</span>
+            </div>
+            <div
+                class="bg-yellow-50 p-4 rounded-2xl border border-yellow-100 flex flex-col items-center text-center shadow-sm">
+                <span class="text-xs text-yellow-600 font-bold mb-1 text-[10px]">เช็คสต๊อก (1-2วัน)</span>
+                <span class="text-2xl font-black text-yellow-600" id="sum-warning">0</span>
+            </div>
+        </div>
+
+        <!-- Visual Analytics Section -->
+        <div class="space-y-4 mb-4">
+            <!-- New: Waste Cost by Category -->
+            <div class="bg-stone-900 rounded-2xl p-4 shadow-xl border border-emerald-900/30 flex flex-col">
+                <label class="text-xs text-emerald-400 font-bold mb-3 flex items-center gap-1">
+                    <i data-lucide="banknote" class="w-4 h-4"></i> มูลค่าการทิ้งแยกตามหมวดหมู่
+                </label>
+                <div class="h-40 w-full flex justify-center">
+                    <canvas id="wasteCostCategoryChart"></canvas>
+                </div>
+            </div>
+            <!-- Waste Trend Chart -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col">
+                <label class="text-xs text-stone-500 font-bold mb-3 flex items-center gap-1">
+                    <i data-lucide="trending-down" class="w-4 h-4 text-red-500"></i> แนวโน้มของเสีย (7 วันล่าสุด)
+                </label>
+                <div class="h-32 w-full">
+                    <canvas id="wasteChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Expiry Forecast Chart -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col">
+                <label class="text-xs text-stone-500 font-bold mb-3 flex items-center gap-1">
+                    <i data-lucide="calendar-clock" class="w-4 h-4 text-amber-500"></i> พยากรณ์สินค้าใกล้หมดอายุ
+                </label>
+                <div class="h-32 w-full">
+                    <canvas id="expiryForecastChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Category Chart (Upgraded) -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col">
+                <label class="text-xs text-stone-500 font-bold mb-3 flex items-center gap-1">
+                    <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-500"></i> สัดส่วนสต๊อกแยกตามหมวดหมู่
+                </label>
+                <div class="h-40 w-full flex justify-center">
+                    <canvas id="categoryChartJs"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Waste Logs Daily Section -->
+        <div
+            class="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col mb-4 max-h-80 overflow-y-auto">
+            <label class="text-xs text-stone-500 font-bold mb-3 flex items-center justify-between">
+                <span class="flex items-center gap-1"><i data-lucide="trash-2" class="w-4 h-4 text-red-500"></i>
+                    สถิติของรับผิดชอบ (ทิ้ง) ประจำวัน</span>
+                <span class="text-[10px] bg-stone-100 px-2 py-0.5 rounded-full" id="wasteTotal">รอโหลด...</span>
+            </label>
+            <div id="wasteList" class="space-y-2">
+                <div class="text-center text-stone-300 text-xs py-4">กำลังโหลดข้อมูล...</div>
+            </div>
+        </div>
+
+        <!-- AI Chef Suggestion Section -->
+        <div
+            class="bg-gradient-to-br from-indigo-900 to-stone-900 rounded-2xl p-5 shadow-lg border border-indigo-500/30 flex flex-col mb-4 text-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-4 opacity-10">
+                <i data-lucide="utensils" class="w-20 h-20"></i>
+            </div>
+            <div class="flex items-center justify-between mb-3 relative z-10">
+                <label class="text-xs font-bold flex items-center gap-2 text-indigo-200">
+                    <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i> AI Chef Suggestion
+                </label>
+                <button onclick="App.generateChefSuggestion()"
+                    class="text-[10px] bg-amber-500 hover:bg-amber-400 text-stone-900 font-bold px-3 py-1.5 rounded-full shadow-lg active:scale-95 transition flex items-center gap-1.5 whitespace-nowrap">
+                    <i data-lucide="wand-2" class="w-3.5 h-3.5"></i> ขอเมนูแนะนำวันนี้
+                </button>
+            </div>
+            <div id="chefSuggestionContent"
+                class="text-sm leading-relaxed text-indigo-50 min-h-[60px] flex items-center justify-center border border-indigo-500/20 rounded-xl p-4 bg-indigo-950/30 backdrop-blur-sm italic">
+                <p class="text-indigo-300/60 text-center">กดปุ่มเพื่อใช้ AI
+                    วิเคราะห์สต๊อกที่ใกล้หมดอายุ<br>และแนะนำเมนูพิเศษสำหรับวันนี้</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex-1 flex flex-col mb-4">
+            <div class="flex items-center justify-between mb-2">
+                <label class="text-xs text-stone-500 font-bold flex items-center gap-1">
+                    <i data-lucide="message-square" class="w-4 h-4 text-amber-500"></i> ข้อความสรุปดิบ
+                </label>
+                <button onclick="App.generateAISummary()"
+                    class="text-xs bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900 font-bold px-3 py-1.5 rounded-xl shadow-md hover:scale-105 active:scale-95 transition flex items-center gap-1.5">
+                    <i data-lucide="sparkles" class="w-4 h-4"></i> ให้ AI ช่วยเรียบเรียง
+                </button>
+            </div>
+            <textarea id="summaryTextPreview" readonly
+                class="w-full min-h-[300px] bg-stone-50 border border-stone-200 rounded-2xl p-4 text-base leading-relaxed focus:outline-none resize-none text-stone-700 shadow-inner"></textarea>
+        </div>
+    </div>
+
+    <div class="p-4 bg-white border-t border-stone-100 flex gap-3 shrink-0 pb-6 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+        <button onclick="App.copySummaryText()"
+            class="flex-1 bg-stone-100 border border-stone-200 text-stone-700 font-bold py-3.5 rounded-xl hover:bg-stone-200 transition flex justify-center items-center gap-2 active:scale-95">
+            <i data-lucide="copy" class="w-5 h-5"></i> คัดลอก
+        </button>
+        <button onclick="App.shareSummaryToLine()"
+            class="flex-1 bg-[#00B900] text-white font-bold py-3.5 rounded-xl hover:bg-[#009900] transition flex justify-center items-center gap-2 shadow-md active:scale-95">
+            <i data-lucide="send" class="w-5 h-5"></i> ส่งต่อผ่าน LINE
+        </button>
+    </div>
+
+    <script src="./app.js?v=999"></script>
+</body>
+
+</html>

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cafe Stock Alert</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- ฟอนต์ Prompt -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- ไอคอน Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="./style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1c1917">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyDbnM6XVkAIj1a1cSuo2qgAJLb4euVLsWg",
+          authDomain: "cafe-stock-alert.firebaseapp.com",
+          projectId: "cafe-stock-alert",
+          storageBucket: "cafe-stock-alert.firebasestorage.app",
+          messagingSenderId: "320377962389",
+          appId: "1:320377962389:web:e71edf9bc87df8028ec09c",
+          measurementId: "G-S9EK0THP2J"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+    </script>
+</head>
+<body class="min-h-screen flex flex-col text-stone-800">
+
+    <!-- Toast Notification -->
+    <div id="toastMsg" onclick="if(window.location.pathname.endsWith('index.html') || window.location.pathname === '/') App.toggleNotificationPanel()" class="cursor-pointer fixed top-16 left-1/2 -translate-x-1/2 bg-stone-800 text-white px-5 py-3 rounded-2xl shadow-2xl z-[200] transition-all duration-500 opacity-0 pointer-events-none flex items-center gap-3 transform -translate-y-10 w-[90%] max-w-sm text-sm font-medium hover:scale-105 active:scale-95">
+        <i data-lucide="bell" id="toastIcon" class="w-6 h-6 text-amber-400 shrink-0"></i>
+        <div class="flex flex-col">
+            <span id="toastTitle" class="font-bold text-[10px] text-stone-300 uppercase tracking-wider mb-0.5 hidden">การแจ้งเตือน</span>
+            <span id="toastText" class="leading-tight">ข้อความ</span>
+        </div>
+    </div>
+
+    <!-- หน้าจอโหลด AI -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-stone-900/90 z-[100] hidden flex-col items-center justify-center text-white backdrop-blur-sm">
+        <div class="relative w-20 h-20 mb-6">
+            <i data-lucide="scan-face" class="w-20 h-20 animate-pulse text-amber-500 absolute inset-0 opacity-50"></i>
+            <div class="absolute inset-0 border-4 border-t-amber-400 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+        </div>
+        <h3 class="font-bold text-xl mb-1">Gemini AI OCR</h3>
+        <p class="text-sm text-stone-300 text-center px-6" id="ocrProgress">กำลังดึงข้อมูล วันหมดอายุ และ ชื่อสินค้า<br>จากรูปภาพของคุณ...</p>
+    </div>
+
+    <!-- Header -->
+    <div class="bg-white px-4 py-3 shadow-sm z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center shrink-0 border-b border-amber-500 border-b-4 relative gap-3">
+        <div class="flex items-center justify-between w-full sm:w-auto">
+            <div>
+                <h1 class="text-lg font-bold text-stone-800 flex items-center gap-2">
+                    <i data-lucide="coffee" class="text-amber-600 w-5 h-5"></i>
+                    Cafe Stock
+                </h1>
+                <p class="text-[10px] text-stone-400" id="headerDate">กำลังโหลดวันที่...</p>
+            </div>
+            <div class="sm:hidden bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-[10px] font-bold" id="itemCountMobile">0 รายการ</div>
+        </div>
+        
+        <div class="header-scroll w-full sm:w-auto pb-1 sm:pb-0">
+            <div class="hidden sm:block bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-[10px] font-bold mr-1" id="itemCount">0 รายการ</div>
+            
+            <button onclick="App.toggleNotificationPanel()" id="btnNotify" class="bg-stone-100 text-stone-500 p-2 rounded-full shadow-sm hover:bg-stone-200 transition active:scale-95 flex items-center justify-center relative" title="ดูการแจ้งเตือน">
+                <i data-lucide="bell" class="w-4 h-4"></i>
+                <span id="notifyBadge" class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+            </button>
+
+            <button onclick="App.showAiHelp()" class="bg-indigo-50 text-indigo-600 p-2 rounded-full shadow-sm hover:bg-indigo-100 transition active:scale-95 flex items-center justify-center" title="วิธีสแกน AI">
+                <i data-lucide="help-circle" class="w-4 h-4"></i>
+            </button>
+
+            <button onclick="window.location.href='all-stock.html'" class="bg-indigo-50 text-indigo-600 p-2 rounded-full shadow-sm hover:bg-indigo-100 transition active:scale-95 flex items-center justify-center relative" title="รวมสต๊อกและแยกเปิด">
+                <i data-lucide="package-search" class="w-4 h-4"></i>
+            </button>
+
+            <button onclick="window.location.href='summary.html'" class="bg-blue-50 text-blue-600 p-2 rounded-full shadow-sm hover:bg-blue-100 transition active:scale-95 flex items-center justify-center" title="สรุปข้อมูล">
+                <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+            </button>
+
+            <button onclick="App.shareToLineQuick()" class="bg-[#00B900] text-white p-2 rounded-full shadow-md hover:bg-[#009900] transition active:scale-95 flex items-center justify-center" title="ส่งเข้า LINE">
+                <i data-lucide="send" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Executive Dashboard Widget (Phase 4) -->
+    <div id="executiveDashboard" class="px-5 mb-4 mt-2">
+        <!-- Will be rendered by App.renderDashboard() -->
+    </div>
+
+    <!-- Search Bar -->
+    <div class="px-5 mb-3">
+        <div class="bg-white rounded-2xl p-1 shadow-sm border border-stone-100 flex items-center gap-2 pr-3">
+            <div class="bg-stone-50 p-2.5 rounded-xl text-stone-400">
+                <i data-lucide="search" class="w-5 h-5"></i>
+            </div>
+            <input type="text" id="searchInput" oninput="App.onSearch(event)" placeholder="ค้นหาชื่อสินค้า..." class="flex-1 bg-transparent border-none py-2 text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-0">
+            <button onclick="App.clearSearch()" class="text-stone-300 hover:text-stone-500 transition">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+    <!-- Filters Area -->
+    <div class="bg-white px-4 py-3 border-b border-stone-100 flex gap-2 overflow-x-auto whitespace-nowrap scrollbar-hide shrink-0" id="filterContainer">
+        <button onclick="App.setFilter('all')" id="flt-all" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-stone-800 text-white shadow-sm">ทั้งหมด</button>
+        <button onclick="App.setFilter('danger')" id="flt-danger" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-stone-100 text-stone-600 border border-stone-200 shadow-sm flex items-center gap-1"><i data-lucide="siren" class="w-3 h-3 text-red-500"></i> ด่วนสุด</button>
+        <button onclick="App.setFilter('นม/ของเหลว')" id="flt-นม" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-stone-100 text-stone-600 border border-stone-200 shadow-sm">นม/ของเหลว</button>
+        <button onclick="App.setFilter('กาแฟ/ชา')" id="flt-กาแฟ" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-stone-100 text-stone-600 border border-stone-200 shadow-sm">กาแฟ/ชา</button>
+        <button onclick="App.setFilter('ไซรัป')" id="flt-ไซรัป" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-stone-100 text-stone-600 border border-stone-200 shadow-sm">ไซรัป</button>
+        <button onclick="App.setFilter('เบเกอรี่')" id="flt-เบเกอรี่" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-stone-100 text-stone-600 border border-stone-200 shadow-sm">เบเกอรี่</button>
+        <button onclick="App.setFilter('อื่นๆ')" id="flt-อื่นๆ" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-stone-100 text-stone-600 border border-stone-200 shadow-sm">อื่นๆ</button>
+    </div>
+
+    <!-- List View -->
+    <div class="flex-1 overflow-y-auto" id="inventoryListScroll">
+        <div class="p-4" id="inventoryList"></div>
+        
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden py-20 flex flex-col items-center justify-center text-stone-400 opacity-60">
+            <i data-lucide="package-search" class="w-16 h-16 mb-4"></i>
+            <p class="font-medium text-lg">ตู้เย็นโล่งมาก ไม่มีสินค้าใกล้หมดอายุ</p>
+            <p class="text-xs">กดปุ่มด้านล่างเพื่อเพิ่มวัตถุดิบที่เพิ่งเปิด</p>
+        </div>
+        
+        <div class="h-32"></div> <!-- Spacer for footer -->
+    </div>
+
+    <div class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-6 py-3.5 rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-stone-200 flex justify-center items-center gap-6 z-20">
+        <button onclick="App.startVoice()" class="flex flex-col items-center gap-1 text-stone-500 hover:text-indigo-600 transition group active:scale-95">
+            <i data-lucide="mic" class="w-5 h-5 group-hover:-translate-y-1 transition-transform"></i>
+            <span class="text-[8px] font-bold whitespace-nowrap">พูดเพื่อเพิ่ม</span>
+        </button>
+
+        <button onclick="window.location.href='add.html'" class="flex flex-col items-center gap-1 text-stone-500 hover:text-indigo-600 transition group active:scale-95">
+            <i data-lucide="file-edit" class="w-5 h-5 group-hover:-translate-y-1 transition-transform"></i>
+            <span class="text-[8px] font-bold">พิมพ์เอง</span>
+        </button>
+
+        <div class="relative flex flex-col items-center justify-center -mt-8 mx-1">
+            <button onclick="document.getElementById('ocrInputDashboard').click()" class="bg-amber-500 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-4 border-white hover:bg-amber-600 transition btn-glow active:scale-95">
+                <i data-lucide="scan-line" class="w-6 h-6"></i>
+            </button>
+            <span class="text-[9px] font-bold text-stone-700 mt-1">AI สแกน</span>
+            
+            <!-- Queue Indicator Badge -->
+            <div id="aiQueueBadge" class="absolute -top-1 -right-1 bg-stone-800 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-md border border-stone-600 hidden items-center gap-1 animate-bounce">
+                <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>
+                <span id="aiQueueCount">0</span>
+            </div>
+            
+            <input type="file" id="ocrInputDashboard" accept="image/*" capture="environment" class="hidden" onchange="App.handleReceiptScan(this)">
+        </div>
+
+        <button onclick="App.openQrScanner()" class="flex flex-col items-center gap-1 text-stone-500 hover:text-indigo-600 transition group active:scale-95">
+            <i data-lucide="qr-code" class="w-5 h-5 group-hover:-translate-y-1 transition-transform"></i>
+            <span class="text-[8px] font-bold">QR สแกน</span>
+        </button>
+
+        <button onclick="window.location.href='quick-add.html'" class="flex flex-col items-center gap-1 text-stone-500 hover:text-indigo-600 transition group active:scale-95">
+            <i data-lucide="zap" class="w-5 h-5 group-hover:-translate-y-1 transition-transform"></i>
+            <span class="text-[8px] font-bold whitespace-nowrap">บวกด่วน</span>
+        </button>
+
+        <div class="flex flex-col items-center gap-1 text-stone-500 cursor-pointer group active:scale-95" onclick="document.getElementById('receiptInputDashboard').click()">
+            <i data-lucide="file-text" class="w-5 h-5 group-hover:-translate-y-1 transition-transform"></i>
+            <span class="text-[8px] font-bold whitespace-nowrap">สแกนบิลรวม</span>
+            <input type="file" id="receiptInputDashboard" accept="image/*" capture="environment" class="hidden" onchange="App.handleReceiptScan(this)">
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- หน้าต่างป๊อปอัป (Modals)                   -->
+    <!-- ========================================== -->
+
+    <!-- Receipt Batch Review Modal (Phase 6 Advanced) -->
+    <div id="receiptReviewModal" class="fixed inset-0 z-[250] hidden flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4 bg-stone-900/60 backdrop-blur-sm overflow-hidden">
+        <div class="bg-white w-full max-w-2xl h-[90vh] sm:h-auto sm:max-h-[85vh] rounded-t-[2.5rem] sm:rounded-[2rem] shadow-2xl flex flex-col overflow-hidden slide-up">
+            <!-- Modal Header -->
+            <div class="pt-8 px-8 pb-4 border-b border-stone-100 flex justify-between items-center bg-white/80 backdrop-blur sticky top-0 z-10">
+                <div>
+                    <h3 class="font-black text-2xl text-stone-800 flex items-center gap-3">
+                        <span class="p-2 bg-indigo-100 text-indigo-600 rounded-2xl">
+                            <i data-lucide="file-check-2" class="w-6 h-6"></i>
+                        </span>
+                        ยืนยันบิล AI
+                    </h3>
+                    <p class="text-stone-400 text-xs font-medium ml-12 mt-1" id="receiptCountText">พบทั้งหมด 0 รายการ</p>
+                </div>
+                <button onclick="App.closeReceiptReview()" class="p-3 bg-stone-50 hover:bg-stone-100 rounded-2xl transition-all">
+                    <i data-lucide="x" class="w-6 h-6 text-stone-400"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content (Scrollable List) -->
+            <div id="itemsReviewList" class="flex-1 overflow-y-auto p-6 space-y-4 bg-stone-50/50">
+                <!-- Receipt items will be rendered here as editable cards -->
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-6 bg-white border-t border-stone-100 flex flex-col gap-3">
+                <button onclick="App.saveAllReceiptItems()" id="btnSaveBatch" class="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+                    <i data-lucide="check-circle" class="w-5 h-5"></i>
+                    บันทึกทั้งหมดลงสต็อก
+                </button>
+                <button onclick="App.closeReceiptReview()" class="w-full py-3 text-stone-400 font-bold text-sm hover:text-stone-600 transition">
+                    ยกเลิกและทิ้งข้อมูล
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Panel (Slide-over) -->
+    <div id="notifyPanel" class="fixed inset-0 z-[150] hidden flex justify-end">
+        <div class="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onclick="App.toggleNotificationPanel()"></div>
+        <div class="relative w-full max-w-sm bg-stone-50 h-full flex flex-col shadow-[-10px_0_30px_rgba(0,0,0,0.1)] slide-left">
+            <div class="bg-white px-5 py-4 border-b border-stone-200 flex justify-between items-center shadow-sm z-10 shrink-0">
+                <h2 class="font-bold text-lg flex items-center gap-2 text-stone-800"><i data-lucide="bell-ring" class="text-amber-500 w-5 h-5"></i> แจ้งเตือน & ประวัติ</h2>
+                <button onclick="App.toggleNotificationPanel()" class="p-2 bg-stone-100 rounded-full text-stone-500 hover:bg-stone-200"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            
+            <div class="px-4 py-2 bg-white border-b border-stone-200 flex gap-2 overflow-x-auto whitespace-nowrap scrollbar-hide shrink-0" id="notifyFilterContainer">
+                <button onclick="App.renderNotifications('all')" class="px-3 py-1 rounded-full text-[10px] font-bold transition bg-stone-800 text-white shadow-sm flt-btn">ทั้งหมด</button>
+                <button onclick="App.renderNotifications('นม/ของเหลว')" class="px-3 py-1 rounded-full text-[10px] font-bold transition bg-stone-100 text-stone-600 border border-stone-200 shadow-sm flt-btn">นม</button>
+                <button onclick="App.renderNotifications('กาแฟ/ชา')" class="px-3 py-1 rounded-full text-[10px] font-bold transition bg-stone-100 text-stone-600 border border-stone-200 shadow-sm flt-btn">กาแฟ</button>
+                <button onclick="App.renderNotifications('ไซรัป')" class="px-3 py-1 rounded-full text-[10px] font-bold transition bg-stone-100 text-stone-600 border border-stone-200 shadow-sm flt-btn">ไซรัป</button>
+                <button onclick="App.renderNotifications('เบเกอรี่')" class="px-3 py-1 rounded-full text-[10px] font-bold transition bg-stone-100 text-stone-600 border border-stone-200 shadow-sm flt-btn">เบเกอรี่</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-3 pb-32" id="notifyList">
+                <div class="text-center text-stone-400 mt-10 text-sm">กำลังโหลด...</div>
+            </div>
+            <div class="bg-white border-t border-stone-200 p-4 shrink-0 absolute bottom-0 left-0 right-0 z-20">
+                <button onclick="App.requestNotifyPermission()" class="w-full bg-stone-800 text-white font-bold py-3.5 rounded-xl shadow-[0_4px_14px_0_rgba(28,25,23,0.39)] flex justify-center items-center gap-2 hover:bg-stone-900 active:scale-[0.98] transition">
+                    <i data-lucide="app-window" class="w-4 h-4"></i> อนุญาตเบราว์เซอร์แจ้งเตือน
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirm Modal (With Reason) -->
+    <div id="deleteConfirmModal" class="fixed inset-0 bg-stone-900/60 z-[150] hidden flex-col items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div class="bg-red-500 p-4 text-white flex items-center gap-2">
+                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                <h3 class="font-bold text-lg">จัดการสินค้านี้</h3>
+            </div>
+            <div class="p-5 text-stone-600 text-center">
+                <p class="font-medium text-lg text-stone-800 mb-1" id="delItemName">ชื่อสินค้า</p>
+                <p class="text-sm">คุณตั้งใจนำสินค้านี้ออกจากระบบด้วยเหตุผลใด?</p>
+            </div>
+            <div class="p-4 bg-stone-50 border-t border-stone-100 flex flex-col gap-2.5">
+                <button onclick="App.confirmDelete('used')" class="w-full bg-emerald-500 text-white font-bold py-3.5 rounded-xl hover:bg-emerald-600 active:scale-[0.98] transition-all flex justify-center items-center gap-2 shadow-sm"><i data-lucide="check-circle" class="w-5 h-5"></i> ใช้หมดแล้ว (คุ้มค่า)</button>
+                <button onclick="App.confirmDelete('wasted')" class="w-full bg-red-500 text-white font-bold py-3.5 rounded-xl hover:bg-red-600 active:scale-[0.98] transition-all flex justify-center items-center gap-2 shadow-sm"><i data-lucide="trash-2" class="w-5 h-5"></i> ต้องทิ้ง / หมดอายุ (สูญเสีย)</button>
+                <button onclick="App.cancelDelete()" class="w-full mt-2 text-stone-500 font-bold py-2.5 rounded-xl hover:bg-stone-200 transition-all">ยกเลิก กลับไปก่อน</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Help Modal -->
+    <div id="aiHelpModal" class="fixed inset-0 bg-stone-900/60 z-[150] hidden flex-col items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div class="bg-indigo-600 p-4 text-white flex justify-between items-center">
+                <h3 class="font-bold flex items-center gap-2"><i data-lucide="scan-line" class="w-5 h-5"></i> คำแนะนำการใช้ AI สแกน</h3>
+                <button onclick="App.closeModal('aiHelpModal')" class="text-white/80 hover:text-white p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-5 text-sm text-stone-600 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div>
+                    <h4 class="font-bold text-stone-800 flex items-center gap-1.5 mb-1.5"><i data-lucide="camera" class="w-4 h-4 text-indigo-500"></i> 1. เทคนิคการถ่ายภาพ</h4>
+                    <ul class="list-disc pl-5 space-y-1.5 text-stone-500">
+                        <li><b>เลี่ยงแสงสะท้อน:</b> (Glare) ทับตัวหนังสือ และระวังภาพเบลอ เพื่อให้อ่านรอด 99%</li>
+                        <li><b>ระยะภาพ:</b> ให้ซูมใกล้ๆ จุดที่มีตัวเลขวันหมดอายุ (EXP, BBF) ไม่จำเป็นต้องถ่ายให้เห็นทั้งขวด เพื่อให้ AI ประมวลผลไวขึ้น</li>
+                    </ul>
+                </div>
+                <div class="pt-2 border-t border-stone-100">
+                    <h4 class="font-bold text-stone-800 flex items-center gap-1.5 mb-1.5"><i data-lucide="shield-alert" class="w-4 h-4 text-amber-500"></i> 2. ถ้าระบบหาข้อมูลไม่เจอ?</h4>
+                    <ul class="list-disc pl-5 space-y-1.5 text-stone-500">
+                        <li>ไม่ต้องตกใจ แอปจะไม่ค้าง! ระบบจะพาไปหน้าแก้ข้อมูล พร้อมแจ้งเตือนว่า "AI หาวันที่ไม่เจอ" ให้คุณ<b>พิมพ์ชื่อ หรือจิ้มเลือกวัน</b>เติมในช่องว่างได้เลย</li>
+                        <li>มอง AI เป็น "ผู้ช่วย" หากฉลากยับหรือจาง การสลับมาพิมพ์เองคือวิธีที่รวดเร็วที่สุดครับ 😊</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="p-4 bg-stone-50 border-t border-stone-100">
+                <button onclick="App.closeModal('aiHelpModal')" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:bg-indigo-700 active:scale-[0.98] transition-all">
+                    เข้าใจแล้ว
+                </button>
+            </div>
+        </div>
+    </div>    <!-- 6. Scripts -->
+    <!-- QR Scanner Modal -->
+    <div id="qrScannerModal" class="fixed inset-0 bg-stone-900/90 z-[200] hidden flex flex-col items-center justify-center p-4 backdrop-blur-md">
+        <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col">
+            <div class="bg-amber-500 p-4 text-white flex justify-between items-center">
+                <h3 class="font-bold flex items-center gap-2"><i data-lucide="qr-code" class="w-5 h-5"></i> สแกน QR Code</h3>
+                <button onclick="App.closeQrScanner()" class="text-white/80 hover:text-white p-1"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            <div class="p-4 flex flex-col items-center">
+                <div id="qr-reader" class="w-full aspect-square bg-stone-100 rounded-2xl overflow-hidden border-2 border-dashed border-stone-200"></div>
+                <p class="text-xs text-stone-400 mt-4 text-center">ส่องกล้องไปที่ QR Code ของวัตถุดิบ<br>เพื่ออัปเดตสถานะหรือดูข้อมูลด่วน</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Sheet for Quick Edit/Confirm -->
+    <div id="bottomSheetOverlay" class="fixed inset-0 bg-stone-900/60 z-[300] hidden backdrop-blur-sm transition-opacity" onclick="App.closeBottomSheet()"></div>
+    <div id="bottomSheet" class="fixed bottom-0 left-0 right-0 bg-white rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[301] p-6 pb-10 transition-transform translate-y-full border-t border-stone-100 max-h-[85vh] overflow-y-auto">
+        <div class="w-12 h-1.5 bg-stone-200 rounded-full mx-auto mb-6"></div>
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-black text-stone-800">ยืนยันข้อมูล <span class="text-indigo-500">AI</span> <span id="bs_batchCount" class="hidden text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded-lg ml-2"></span></h3>
+            <button onclick="App.closeBottomSheet()" class="text-stone-300 hover:text-stone-500"><i data-lucide="x-circle" class="w-6 h-6"></i></button>
+        </div>
+        
+        <div class="space-y-4">
+            <div class="space-y-1.5">
+                <label class="text-[10px] font-bold text-stone-400 uppercase tracking-wider ml-1">ชื่อสินค้าที่พบ</label>
+                <input type="text" id="bs_itemName" class="w-full bg-stone-50 border border-stone-200 rounded-2xl px-5 py-4 text-stone-800 font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-stone-300" placeholder="ชื่อสินค้า">
+            </div>
+
+            <div class="space-y-1.5">
+                <label class="text-[10px] font-bold text-stone-400 uppercase tracking-wider ml-1">วันหมดอายุ (Expiry)</label>
+                <input type="datetime-local" id="bs_expiryDate" class="w-full bg-stone-50 border border-stone-200 rounded-2xl px-5 py-4 text-stone-800 font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                
+                <!-- Smart Tapping Buttons -->
+                <div class="flex gap-2 mt-2" id="smartDates">
+                    <button onclick="App.addBsDays(3)" class="flex-1 py-2 bg-stone-100 rounded-xl text-[10px] font-bold text-stone-500 hover:bg-indigo-50 hover:text-indigo-600 transition">+3 วัน</button>
+                    <button onclick="App.addBsDays(7)" class="flex-1 py-2 bg-stone-100 rounded-xl text-[10px] font-bold text-stone-500 hover:bg-indigo-50 hover:text-indigo-600 transition">+7 วัน</button>
+                    <button onclick="App.addBsDays(14)" class="flex-1 py-2 bg-stone-100 rounded-xl text-[10px] font-bold text-stone-500 hover:bg-indigo-50 hover:text-indigo-600 transition">+14 วัน</button>
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-4">
+                <button onclick="App.saveFromBottomSheet()" class="flex-[2] bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-[0_10px_20px_rgba(79,70,229,0.3)] hover:bg-indigo-700 active:scale-95 transition-all text-center">
+                    บันทึกทันที
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voice Input Animation Overlay -->
+    <div id="voiceOverlay" class="fixed inset-0 bg-indigo-600/90 z-[350] hidden flex flex-col items-center justify-center text-white backdrop-blur-md">
+        <div class="relative">
+            <div class="absolute inset-0 bg-white/20 rounded-full animate-ping"></div>
+            <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-2xl relative z-10">
+                <i data-lucide="mic" class="w-10 h-10 text-indigo-600"></i>
+            </div>
+        </div>
+        <h2 class="text-2xl font-black mt-8">กำลังฟังเสียง...</h2>
+        <p class="text-white/70 mt-2 text-center px-8">"พูดชื่อสินค้า และวันหมดอายุได้เลยครับ"</p>
+        <button onclick="App.stopVoice()" class="mt-12 px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full font-bold transition">ยกเลิก</button>
+    </div>
+
+    <script src="./app.js?v=999"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW Registered'))
+                    .catch(err => console.log('SW Failed', err));
+            });
+        }
+    </script>
+</body>
+</html>

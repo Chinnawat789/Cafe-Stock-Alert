@@ -1,0 +1,167 @@
+body { 
+            font-family: 'Prompt', sans-serif; 
+            background-color: #fafaf9;
+            -webkit-tap-highlight-color: transparent; 
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .modal-enter { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideUp { 
+            from { transform: translateY(100%); } 
+            to { transform: translateY(0); } 
+        }
+
+        .quick-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            border-width: 2px;
+            border-color: #fef3c7;
+            background-color: #fffbeb;
+            color: #92400e;
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+        .quick-btn:active {
+            transform: scale(.95);
+        }
+        .quick-btn:hover {
+            background-color: #fef3c7;
+            border-color: #fcd34d;
+        }
+
+/* Dashboard Phase 4 */
+.health-ring {
+    transition: stroke-dashoffset 1s ease-in-out;
+}
+.dashboard-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dashboard-card:active {
+    transform: scale(0.97);
+}
+.insight-item {
+    animation: slideInUp 0.4s ease-out forwards;
+    opacity: 0;
+}
+@keyframes slideInUp {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Phase 5: Ultimate Overview Styles */
+.fuel-gauge-fill {
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.heatmap-tile {
+    transition: transform 0.2s ease-out;
+}
+.heatmap-tile:hover {
+    transform: scale(1.1);
+}
+#quickStatusBar {
+    animation: slideInDown 0.3s ease-out;
+}
+@keyframes slideInDown {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+}
+
+.rotate-180 {
+    transform: rotate(180deg);
+}
+
+/* Batch Review Styles */
+.slide-up {
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.review-card {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.review-card:focus-within {
+    border-color: #6366f1;
+    background-color: white;
+    box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.1);
+}
+
+.btn-glow {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+}
+
+/* Custom Scrollbar for review list */
+#itemsReviewList::-webkit-scrollbar {
+    width: 6px;
+}
+#itemsReviewList::-webkit-scrollbar-track {
+    background: transparent;
+}
+#itemsReviewList::-webkit-scrollbar-thumb {
+    background: #E5E7EB;
+    border-radius: 10px;
+}
+
+#bottomSheet.show {
+    transform: translateY(0);
+}
+
+.btn-glow {
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+    animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+    0% { box-shadow: 0 0 5px rgba(245, 158, 11, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.6); }
+    100% { box-shadow: 0 0 5px rgba(245, 158, 11, 0.3); }
+}
+
+#bottomSheet {
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* Improved Mobile Responsiveness */
+html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+    position: relative;
+}
+
+.header-scroll {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    gap: 0.5rem;
+    padding-bottom: 2px;
+}
+.header-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .container-wide {
+        width: 100% !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+}

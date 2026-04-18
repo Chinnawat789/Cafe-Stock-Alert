@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>สต๊อกแยกตามล็อต | Cafe Stock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1c1917">
+
+        <style>
+        body { font-family: 'Prompt', sans-serif; -webkit-tap-highlight-color: transparent; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 4px; }
+    </style>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyDbnM6XVkAIj1a1cSuo2qgAJLb4euVLsWg",
+          authDomain: "cafe-stock-alert.firebaseapp.com",
+          projectId: "cafe-stock-alert",
+          storageBucket: "cafe-stock-alert.firebasestorage.app",
+          messagingSenderId: "320377962389",
+          appId: "1:320377962389:web:e71edf9bc87df8028ec09c",
+          measurementId: "G-S9EK0THP2J"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+    </script>
+</head>
+<body class="bg-stone-50 text-stone-800 font-sans h-screen flex flex-col bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] overflow-hidden">
+    <!-- Quick Status Bar (Phase 5) -->
+    <div id="quickStatusBar" class="sticky top-0 z-[100] bg-white/80 backdrop-blur-md border-b border-stone-200 hidden">
+        <div class="h-1 w-full bg-stone-100 overflow-hidden">
+            <div id="statusProgress" class="h-full bg-emerald-500 transition-all duration-1000" style="width: 100%"></div>
+        </div>
+        <div class="flex justify-between items-center px-4 py-1.5">
+            <span id="statusLabel" class="text-[9px] font-black uppercase text-stone-400">สถานะสต๊อกปกติ 🟢</span>
+            <span id="statusPercent" class="text-[9px] font-black text-stone-600">100%</span>
+        </div>
+    </div>
+
+    <!-- Navbar -->
+    <div class="bg-white px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center relative z-20 shadow-sm border-b border-stone-100 gap-3">
+        <div class="flex items-center justify-between w-full sm:w-auto">
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="p-2 -ml-2 rounded-full hover:bg-stone-100 transition active:scale-90">
+                    <i data-lucide="chevron-left" class="w-6 h-6 text-stone-600"></i>
+                </a>
+                <div>
+                    <h1 class="text-xl font-black tracking-tight text-stone-800">สต๊อกภาพรวม</h1>
+                    <p class="text-[10px] text-stone-400 font-medium">แยกตามรายชื่อและการเปิดใช้งาน</p>
+                </div>
+            </div>
+            <div class="sm:hidden w-10 h-10 bg-[#FF6B6B]/10 rounded-full flex items-center justify-center text-[#FF6B6B]">
+                <i data-lucide="package-open" class="w-5 h-5"></i>
+            </div>
+        </div>
+        <div class="hidden sm:flex w-10 h-10 bg-[#FF6B6B]/10 rounded-full flex items-center justify-center text-[#FF6B6B]">
+            <i data-lucide="package-open" class="w-5 h-5"></i>
+        </div>
+    </div>
+
+    <!-- Search & Filters -->
+    <div class="px-5 mb-2">
+        <div class="bg-white rounded-2xl p-1 shadow-sm border border-stone-100 flex items-center gap-2 pr-3 mb-3">
+            <div class="bg-stone-50 p-2.5 rounded-xl text-stone-400">
+                <i data-lucide="search" class="w-5 h-5"></i>
+            </div>
+            <input type="text" id="allStockSearchInput" oninput="App.onAllStockSearch(event)" placeholder="ค้นหาชื่อสินค้าในสต๊อก..." class="flex-1 bg-transparent border-none py-2 text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-0">
+            <button onclick="App.clearAllStockSearch()" class="text-stone-300 hover:text-stone-500 transition">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <div id="allStockFilterContainer" class="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+            <button onclick="App.setAllStockFilter('all')" id="ast-all" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-[#FF6B6B] text-white shadow-md">ทั้งหมด</button>
+            <button onclick="App.setAllStockFilter('นม/ของเหลว')" id="ast-นม" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-white text-stone-600 border border-stone-100 shadow-sm">นม/ของเหลว</button>
+            <button onclick="App.setAllStockFilter('กาแฟ/ชา')" id="ast-กาแฟ" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-white text-stone-600 border border-stone-100 shadow-sm">กาแฟ/ชา</button>
+            <button onclick="App.setAllStockFilter('ไซรัป')" id="ast-ไซรัป" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-white text-stone-600 border border-stone-100 shadow-sm">ไซรัป</button>
+            <button onclick="App.setAllStockFilter('อื่นๆ')" id="ast-อื่นๆ" class="px-4 py-1.5 rounded-full text-xs font-bold transition bg-white text-stone-600 border border-stone-100 shadow-sm">อื่นๆ</button>
+        </div>
+    </div>
+
+    <!-- Heatmap Header (Phase 5) -->
+    <div id="allStockHeatmap" class="px-5 mb-4 mt-2"></div>
+
+    <!-- Grand Summary -->
+    <div class="px-5 mb-1 grid grid-cols-3 gap-2">
+        <div class="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100 flex flex-col">
+            <span class="text-[9px] text-indigo-500 font-bold uppercase tracking-wider mb-1">กลุ่มสินค้า</span>
+            <span class="text-xl font-bold text-indigo-700" id="grandGroups">0</span>
+        </div>
+        <div class="bg-amber-50/50 p-3 rounded-2xl border border-amber-100 flex flex-col">
+            <span class="text-[9px] text-amber-600 font-bold uppercase tracking-wider mb-1">ชิ้นรวม</span>
+            <span class="text-xl font-bold text-amber-700" id="grandUnits">0</span>
+        </div>
+        <div class="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100 flex flex-col">
+            <span class="text-[9px] text-emerald-600 font-bold uppercase tracking-wider mb-1">เปิดใช้งาน</span>
+            <span class="text-xl font-bold text-emerald-700" id="grandOpened">0</span>
+        </div>
+    </div>
+
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto p-4 pb-24 relative z-10 space-y-5" id="allStockContainer">
+        <!-- Rendered by JS -->
+        <div class="text-center py-20"><div class="animate-spin w-8 h-8 border-4 border-[#FF6B6B] border-t-transparent rounded-full mx-auto"></div></div>
+    </div>
+    <!-- Toast Notification -->
+    <div id="toastMsg" onclick="if(window.location.pathname.endsWith('index.html') || window.location.pathname === '/') App.toggleNotificationPanel()" class="cursor-pointer fixed top-16 left-1/2 -translate-x-1/2 bg-stone-800 text-white px-5 py-3 rounded-2xl shadow-2xl z-[200] transition-all duration-500 opacity-0 pointer-events-none flex items-center gap-3 transform -translate-y-10 w-[90%] max-w-sm text-sm font-medium hover:scale-105 active:scale-95">
+        <i data-lucide="bell" id="toastIcon" class="w-6 h-6 text-amber-400 shrink-0"></i>
+        <div class="flex flex-col">
+            <span id="toastTitle" class="font-bold text-[10px] text-stone-300 uppercase tracking-wider mb-0.5 hidden">การแจ้งเตือน</span>
+            <span id="toastText" class="leading-tight">ข้อความ</span>
+        </div>
+    </div>
+    
+    <!-- Modals area -->
+    <div id="wasteModal" class="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-50 hidden opacity-0 transition-opacity duration-300 pb-safe"></div>
+
+    <!-- Delete Confirm Modal (With Reason) -->
+    <div id="deleteConfirmModal" class="fixed inset-0 bg-stone-900/60 z-[150] hidden flex-col items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+            <div class="bg-red-500 p-4 text-white flex items-center gap-2">
+                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                <h3 class="font-bold text-lg">จัดการสินค้านี้</h3>
+            </div>
+            <div class="p-5 text-stone-600 text-center">
+                <p class="font-medium text-lg text-stone-800 mb-1" id="delItemName">ชื่อสินค้า</p>
+                <p class="text-sm">คุณตั้งใจนำสินค้านี้ออกจากระบบด้วยเหตุผลใด?</p>
+            </div>
+            <div class="p-4 bg-stone-50 border-t border-stone-100 flex flex-col gap-2.5">
+                <button onclick="App.confirmDelete('used')" class="w-full bg-emerald-500 text-white font-bold py-3.5 rounded-xl hover:bg-emerald-600 active:scale-[0.98] transition-all flex justify-center items-center gap-2 shadow-sm"><i data-lucide="check-circle" class="w-5 h-5"></i> ใช้หมดแล้ว (คุ้มค่า)</button>
+                <button onclick="App.confirmDelete('wasted')" class="w-full bg-red-500 text-white font-bold py-3.5 rounded-xl hover:bg-red-600 active:scale-[0.98] transition-all flex justify-center items-center gap-2 shadow-sm"><i data-lucide="trash-2" class="w-5 h-5"></i> ต้องทิ้ง / หมดอายุ (สูญเสีย)</button>
+                <button onclick="App.cancelDelete()" class="w-full mt-2 text-stone-500 font-bold py-2.5 rounded-xl hover:bg-stone-200 transition-all">ยกเลิก กลับไปก่อน</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>lucide.createIcons();</script>
+    <script src="./app.js?v=999"></script>
+</body>
+</html>
